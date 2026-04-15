@@ -1,5 +1,5 @@
 {
-  "watchlist": ["BTCUSDT"],
+  "watchlist": ["BTCUSDT", "SOLUSDT", "ETHUSDT", "DOGEUSDT"],
   "default_timeframe": "1m",
 
   "strategy": {
