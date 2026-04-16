@@ -75,26 +75,9 @@ railway logs
 railway up
 ```
 
-## BitGet demo trading — hard-won API notes
+## Reference docs
 
-BitGet's simulated trading environment has several non-obvious requirements that differ from their docs:
-
-| What | Wrong | Correct |
-|---|---|---|
-| Demo header value | `papTrading: "true"` | `papTrading: "1"` |
-| Futures order endpoint | `/api/v2/mix/order/placeOrder` | `/api/v2/mix/order/place-order` |
-| Futures `size` unit | number of contracts | BTC amount (4 dp, min `0.0001`) |
-| Futures margin mode | `"isolated"` | `"crossed"` (demo account default) |
-| Spot endpoint in demo | works | **not supported** — 404s always |
-
-**Demo API keys** must be generated from within BitGet's Simulated Trading mode:
-BitGet → top-right toggle → Simulated Trading → API Management → Create key.
-Demo keys only work with `papTrading: "1"`. Live keys only work without it.
-
-**Demo account comes with $100 USDT** in the futures wallet. At $75k BTC, the minimum
-order (0.0001 BTC) costs ~$7.50 notional. Set leverage ≥ 10x if needed.
-
-**`tradeSide: "open"`** is required on futures entry orders or the request is rejected.
+- `docs/bitget-api-notes.md` — BitGet API quirks, demo setup, and live switchover steps
 
 ## TradingView MCP
 
