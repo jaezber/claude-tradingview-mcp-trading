@@ -327,22 +327,28 @@ function signBitGet(timestamp, method, path, body = "") {
 }
 
 async function placeBitGetOrder(symbol, side, sizeUSD, price) {
-  const quantity = (sizeUSD / price).toFixed(6);
   const timestamp = Date.now().toString();
-  const path =
-    CONFIG.tradeMode === "spot"
-      ? "/api/v2/spot/trade/placeOrder"
-      : "/api/v2/mix/order/placeOrder";
+  const isFutures = CONFIG.tradeMode === "futures";
+
+  // Futures size is in BTC (4 dp, min 0.0001); spot size is base quantity (6 dp)
+  const size = isFutures
+    ? String(Math.max(0.0001, parseFloat((sizeUSD / price).toFixed(4))))
+    : (sizeUSD / price).toFixed(6);
+
+  const path = isFutures
+    ? "/api/v2/mix/order/place-order"
+    : "/api/v2/spot/trade/placeOrder";
 
   const body = JSON.stringify({
     symbol,
     side,
     orderType: "market",
-    quantity,
-    ...(CONFIG.tradeMode === "futures" && {
+    size,
+    ...(isFutures && {
       productType: "USDT-FUTURES",
-      marginMode: "isolated",
+      marginMode: "crossed",
       marginCoin: "USDT",
+      tradeSide: "open",
     }),
   });
 
@@ -356,7 +362,7 @@ async function placeBitGetOrder(symbol, side, sizeUSD, price) {
       "ACCESS-SIGN": signature,
       "ACCESS-TIMESTAMP": timestamp,
       "ACCESS-PASSPHRASE": CONFIG.bitget.passphrase,
-      ...(CONFIG.bitget.demo && { papTrading: "true" }),
+      ...(CONFIG.bitget.demo && { papTrading: "1" }),
     },
     body,
   });
