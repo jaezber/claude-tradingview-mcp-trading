@@ -12,14 +12,15 @@ Everything has been set up. Do not re-run onboarding. The bot is live and deploy
 
 | Setting | Value |
 |---|---|
-| Exchange | BitGet (spot trading) |
-| Symbol | BTCUSDT |
+| Exchange | BitGet (USDT-futures, demo account) |
+| Symbol | BTCUSDT, SOLUSDT, ETHUSDT, DOGEUSDT |
 | Timeframe | 4H |
 | Portfolio value | $1,000 |
 | Max trade size | $50 |
 | Max trades/day | 3 |
-| Mode | **PAPER TRADING** (no real money until flipped) |
+| Mode | **DEMO TRADING** (real API calls, simulated money) |
 | Cloud schedule | Every 4 hours (`0 */4 * * *`) |
+| GitHub | https://github.com/jaezber/claude-tradingview-mcp-trading |
 
 ## Files
 
@@ -56,11 +57,12 @@ VWAP + RSI(3) + EMA(8) scalping on the 1-minute chart.
 - Project: `alluring-fascination`
 - Service: `alluring-fascination`
 - URL: https://railway.com/project/3c32f1ef-b245-4de1-9af8-e76d0b3724b3
-- All env vars are set in Railway (credentials, limits, PAPER_TRADING=true)
+- Env vars set: `PAPER_TRADING=false`, `BITGET_DEMO=true`, `TRADE_MODE=futures`
 
 **To go live (real money):**
 ```bash
-railway variable set PAPER_TRADING=false
+railway variable set BITGET_DEMO=false
+# Also swap .env credentials to your live BitGet API keys
 ```
 
 **To check logs:**
@@ -72,6 +74,27 @@ railway logs
 ```bash
 railway up
 ```
+
+## BitGet demo trading — hard-won API notes
+
+BitGet's simulated trading environment has several non-obvious requirements that differ from their docs:
+
+| What | Wrong | Correct |
+|---|---|---|
+| Demo header value | `papTrading: "true"` | `papTrading: "1"` |
+| Futures order endpoint | `/api/v2/mix/order/placeOrder` | `/api/v2/mix/order/place-order` |
+| Futures `size` unit | number of contracts | BTC amount (4 dp, min `0.0001`) |
+| Futures margin mode | `"isolated"` | `"crossed"` (demo account default) |
+| Spot endpoint in demo | works | **not supported** — 404s always |
+
+**Demo API keys** must be generated from within BitGet's Simulated Trading mode:
+BitGet → top-right toggle → Simulated Trading → API Management → Create key.
+Demo keys only work with `papTrading: "1"`. Live keys only work without it.
+
+**Demo account comes with $100 USDT** in the futures wallet. At $75k BTC, the minimum
+order (0.0001 BTC) costs ~$7.50 notional. Set leverage ≥ 10x if needed.
+
+**`tradeSide: "open"`** is required on futures entry orders or the request is rejected.
 
 ## TradingView MCP
 
