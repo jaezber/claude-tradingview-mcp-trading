@@ -13,6 +13,7 @@ import "dotenv/config";
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from "fs";
 import crypto from "crypto";
 import { execSync } from "child_process";
+import { google } from "googleapis";
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
@@ -20,43 +21,39 @@ function checkOnboarding() {
   const required = ["BITGET_API_KEY", "BITGET_SECRET_KEY", "BITGET_PASSPHRASE"];
   const missing = required.filter((k) => !process.env[k]);
 
-  if (!existsSync(".env")) {
-    console.log(
-      "\n⚠️  No .env file found — opening it for you to fill in...\n",
-    );
-    writeFileSync(
-      ".env",
-      [
-        "# BitGet credentials",
-        "BITGET_API_KEY=",
-        "BITGET_SECRET_KEY=",
-        "BITGET_PASSPHRASE=",
-        "",
-        "# Trading config",
-        "PORTFOLIO_VALUE_USD=1000",
-        "MAX_TRADE_SIZE_USD=100",
-        "MAX_TRADES_PER_DAY=3",
-        "PAPER_TRADING=true",
-        "SYMBOL=BTCUSDT",
-        "TIMEFRAME=4H",
-      ].join("\n") + "\n",
-    );
-    try {
-      execSync("open .env");
-    } catch {}
-    console.log(
-      "Fill in your BitGet credentials in .env then re-run: node bot.js\n",
-    );
-    process.exit(0);
-  }
-
   if (missing.length > 0) {
-    console.log(`\n⚠️  Missing credentials in .env: ${missing.join(", ")}`);
-    console.log("Opening .env for you now...\n");
-    try {
-      execSync("open .env");
-    } catch {}
-    console.log("Add the missing values then re-run: node bot.js\n");
+    // If no .env file exists and we're not in a cloud environment, create one for the user
+    if (!existsSync(".env") && !process.env.RAILWAY_ENVIRONMENT) {
+      console.log(
+        "\n⚠️  No .env file found — opening it for you to fill in...\n",
+      );
+      writeFileSync(
+        ".env",
+        [
+          "# BitGet credentials",
+          "BITGET_API_KEY=",
+          "BITGET_SECRET_KEY=",
+          "BITGET_PASSPHRASE=",
+          "",
+          "# Trading config",
+          "PORTFOLIO_VALUE_USD=1000",
+          "MAX_TRADE_SIZE_USD=100",
+          "MAX_TRADES_PER_DAY=3",
+          "PAPER_TRADING=true",
+          "SYMBOL=BTCUSDT",
+          "TIMEFRAME=4H",
+        ].join("\n") + "\n",
+      );
+      try {
+        execSync("open .env");
+      } catch {}
+      console.log(
+        "Fill in your BitGet credentials in .env then re-run: node bot.js\n",
+      );
+    } else {
+      console.log(`\n⚠️  Missing credentials: ${missing.join(", ")}`);
+      console.log("Add the missing values to your environment variables.\n");
+    }
     process.exit(0);
   }
 
@@ -405,7 +402,7 @@ const CSV_HEADERS = [
   "Notes",
 ].join(",");
 
-function writeTradeCsv(logEntry) {
+async function writeTradeCsv(logEntry) {
   const now = new Date(logEntry.timestamp);
   const date = now.toISOString().slice(0, 10);
   const time = now.toISOString().slice(11, 19);
@@ -469,6 +466,58 @@ function writeTradeCsv(logEntry) {
 
   appendFileSync(CSV_FILE, row + "\n");
   console.log(`Tax record saved → ${CSV_FILE}`);
+
+  const sheetRow = [date, time, "BitGet", logEntry.symbol, side, quantity,
+    logEntry.price.toFixed(2), totalUSD, fee, netAmount, orderId, mode, notes];
+  await appendToGoogleSheets(sheetRow);
+}
+
+// ─── Google Sheets Sync ───────────────────────────────────────────────────────
+
+const SHEET_ID = process.env.GOOGLE_SHEET_ID || "1MMh9xNsXQnBaQhsEn7rKGkgQI2kxc2Md3xk4KQtsON8";
+
+async function getGoogleSheets() {
+  const credJson = process.env.GOOGLE_SERVICE_ACCOUNT;
+  if (!credJson) return null;
+  const credentials = JSON.parse(credJson);
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  return google.sheets({ version: "v4", auth });
+}
+
+async function initGoogleSheet(sheets) {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: "A1",
+  });
+  const a1 = res.data.values?.[0]?.[0];
+  if (a1 !== "Date") {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: "A1",
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [CSV_HEADERS.split(",")] },
+    });
+  }
+}
+
+async function appendToGoogleSheets(row) {
+  try {
+    const sheets = await getGoogleSheets();
+    if (!sheets) return;
+    await initGoogleSheet(sheets);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: "A1",
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+    console.log("Google Sheets updated ✓");
+  } catch (err) {
+    console.log(`Google Sheets sync failed (non-fatal): ${err.message}`);
+  }
 }
 
 // Tax summary command: node bot.js --tax-summary
@@ -590,7 +639,7 @@ async function runSymbol(symbol, rules, log) {
   log.trades.push(logEntry);
   saveLog(log);
   console.log(`\nDecision log saved → ${LOG_FILE}`);
-  writeTradeCsv(logEntry);
+  await writeTradeCsv(logEntry);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
