@@ -84,6 +84,7 @@ const CONFIG = {
     secretKey: process.env.BITGET_SECRET_KEY,
     passphrase: process.env.BITGET_PASSPHRASE,
     baseUrl: process.env.BITGET_BASE_URL || "https://api.bitget.com",
+    demo: process.env.BITGET_DEMO === "true",
   },
 };
 
@@ -355,6 +356,7 @@ async function placeBitGetOrder(symbol, side, sizeUSD, price) {
       "ACCESS-SIGN": signature,
       "ACCESS-TIMESTAMP": timestamp,
       "ACCESS-PASSPHRASE": CONFIG.bitget.passphrase,
+      ...(CONFIG.bitget.demo && { papTrading: "true" }),
     },
     body,
   });
@@ -435,7 +437,7 @@ function writeTradeCsv(logEntry) {
     fee = (logEntry.tradeSize * 0.001).toFixed(4);
     netAmount = (logEntry.tradeSize - parseFloat(fee)).toFixed(2);
     orderId = logEntry.orderId || "";
-    mode = "LIVE";
+    mode = logEntry.demoTrading ? "DEMO" : "LIVE";
     notes = logEntry.error ? `Error: ${logEntry.error}` : "All conditions met";
   }
 
@@ -539,6 +541,7 @@ async function runSymbol(symbol, rules, log) {
     orderPlaced: false,
     orderId: null,
     paperTrading: CONFIG.paperTrading,
+    demoTrading: CONFIG.bitget.demo,
     limits: {
       maxTradeSizeUSD: CONFIG.maxTradeSizeUSD,
       maxTradesPerDay: CONFIG.maxTradesPerDay,
@@ -563,7 +566,7 @@ async function runSymbol(symbol, rules, log) {
       logEntry.orderId = `PAPER-${Date.now()}`;
     } else {
       console.log(
-        `\n🔴 PLACING LIVE ORDER — $${tradeSize.toFixed(2)} BUY ${symbol}`,
+        `\n${CONFIG.bitget.demo ? "🟡 PLACING DEMO ORDER" : "🔴 PLACING LIVE ORDER"} — $${tradeSize.toFixed(2)} BUY ${symbol}`,
       );
       try {
         const order = await placeBitGetOrder(symbol, "buy", tradeSize, price);
@@ -593,7 +596,7 @@ async function run() {
   console.log("  Claude Trading Bot");
   console.log(`  ${new Date().toISOString()}`);
   console.log(
-    `  Mode: ${CONFIG.paperTrading ? "📋 PAPER TRADING" : "🔴 LIVE TRADING"}`,
+    `  Mode: ${CONFIG.paperTrading ? "📋 PAPER TRADING" : CONFIG.bitget.demo ? "🟡 DEMO TRADING" : "🔴 LIVE TRADING"}`,
   );
   console.log("═══════════════════════════════════════════════════════════");
 
