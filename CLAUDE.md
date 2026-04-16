@@ -17,9 +17,9 @@ Everything has been set up. Do not re-run onboarding. The bot is live and deploy
 | Timeframe | 4H |
 | Portfolio value | $1,000 |
 | Max trade size | $50 |
-| Max trades/day | 3 |
+| Max trades/day | 10 |
 | Mode | **DEMO TRADING** (real API calls, simulated money) |
-| Cloud schedule | Every 4 hours (`0 */4 * * *`) |
+| Cloud schedule | Every 10 minutes (`*/10 * * * *`) |
 | GitHub | https://github.com/jaezber/claude-tradingview-mcp-trading |
 
 ## Files
@@ -72,8 +72,11 @@ railway logs
 
 **To redeploy after code changes:**
 ```bash
-railway up
+git add <changed files>
+git commit -m "description"
+git push
 ```
+Railway is connected to GitHub and auto-deploys on push. Do NOT use `railway up` — it does a direct local upload which scans the user's machine and triggers macOS privacy prompts.
 
 ## Reference docs
 
