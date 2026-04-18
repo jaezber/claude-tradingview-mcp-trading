@@ -359,7 +359,7 @@ async function placeBitGetOrder(symbol, side, sizeUSD, price) {
       "ACCESS-SIGN": signature,
       "ACCESS-TIMESTAMP": timestamp,
       "ACCESS-PASSPHRASE": CONFIG.bitget.passphrase,
-      ...(CONFIG.bitget.demo && { papTrading: "1" }),
+      ...(CONFIG.bitget.demo && { "X-Simulated-Trading": "1" }),
     },
     body,
   });
